@@ -1,0 +1,154 @@
+<html>
+  <head>
+
+  <title>Goal Tracker and Predictor</title>
+
+
+  <script src="http://www.google.com/jsapi" type="text/javascript"></script>
+  <script type="text/javascript">
+
+
+    google.load ("visualization", "1", {packages:["linechart"]});
+
+
+    function Do_DrawChart (data) {
+      var chart;
+      var chartData;
+      var goal = GetGoal();
+      var haveGoal = ! isNaN (goal);
+
+      chartData = PlotData (data, goal, haveGoal);
+
+      chart = document.getElementById ('chart');
+      chart = new google.visualization.LineChart (chart);
+      chart.draw (chartData,
+                  {width: 600, height: 450, legend: 'bottom',
+                  title: 'Goal Tracking and Predicting'});
+    }
+
+
+    function DrawChart() {
+      var data = [];
+      var i;
+      var points;
+
+      points = document.getElementById ("points").value.replace ('\r', '\n');
+      // get rid of blanks, even spurious ones caused by Mac/DOS line-endings
+      while (points.indexOf ('\n\n') != -1) points = points.replace ('\n\n', '\n');
+      points = points.split ('\n');
+      for (i = 0; i < points.length; i++) {
+        var point;
+        var val;
+        point = points[i];
+        if (point == '') continue;
+        val = parseFloat (point);
+        if (isNaN (val)) alert ('"' + point + '" is not a number!');
+        else data.push (val);
+      }
+
+      if (data.length == 0) {
+        alert ('I need valid data points!');
+        return;
+      }
+
+      Do_DrawChart (data);
+    }
+
+
+    function GetGoal() {
+      // TODO: also strip whitespace
+      str = document.getElementById ("goal").value;
+      if (str == '') return NaN;
+
+      var tmp = parseFloat (str);  // could also make it NaN
+      if (isNaN (tmp)) alert ('"' + str + '" is not a number!');
+      return tmp;
+    }
+
+
+    // TODO: modularize this some more....
+    function PlotData (data, goal, haveGoal) {
+      var chartData = new google.visualization.DataTable();
+      var first;
+      var fullNeed = -1;
+      var fullSlope;
+      var goal;
+      var haveGoal;
+      var last;
+      var last2Need = -1;
+      var last2Slope;
+      var need;
+      var secondLast;
+
+      chartData.addColumn ('string', 'Sample Number');  // x axis
+      chartData.addColumn ('number', 'Samples');
+      if (data.length > 1) {
+        chartData.addColumn ('number', 'Projection from 1st and Last');
+        if (data.length > 2) {
+          chartData.addColumn ('number', 'Projection from Last Two');
+        }
+      }
+      if (haveGoal) chartData.addColumn ('number', 'Target');
+
+      first = parseFloat (data[0], 10);
+      last = parseFloat (data[data.length - 1], 10);
+      fullNeed = data.length;
+      if (data.length > 1) {
+        fullSlope = (last - first) / (data.length - 1);
+        if (haveGoal && fullSlope != 0) {
+          fullNeed = Math.ceil ((goal - first) / fullSlope) + 1;
+          if (fullNeed < data.length) fullNeed = data.length;
+        }
+
+        if (data.length > 2) {
+          secondLast = parseFloat (data[data.length - 2], 10);
+          last2Slope = last - secondLast;
+          last2Need = data.length;
+          if (haveGoal && last2Slope != 0) {
+            last2Need = data.length - 2 +
+                        Math.ceil ((goal - secondLast) / last2Slope);
+            if (last2Need < data.length) last2Need = data.length;
+          }
+        }
+      }
+
+      need = fullNeed > last2Need ? fullNeed : last2Need;
+      need = need > data.length ? need : data.length + 1;
+      chartData.addRows (need);
+      for (i = 0; i < need; i++) {
+        chartData.setValue (i, 0, String (i+1));
+        if (i < data.length) chartData.setValue (i, 1, parseFloat (data[i], 10));
+        if (i <= fullNeed) chartData.setValue (i, 2, first + fullSlope * i);
+        if (i >= data.length - 1 && i <= last2Need) {
+          chartData.setValue (i, 3, secondLast +
+                                    last2Slope * (i - (data.length - 2)));
+        }
+        if (haveGoal) chartData.setValue (i, 4, goal);
+      }
+
+      return chartData;
+    }
+
+
+  </script>
+  </head>
+  <body>
+
+    <h1 align="center">Dave Aronson's Google Visualization API<br/>Goal Tracker and Predictor</h1>
+
+    <p><hr>
+
+    <p><table>
+      <tr>
+        <td>
+          Goal (optional):<br/><input id="goal" size="3" type="text" />
+          <p>Samples:<br/>
+          <textarea id="points" cols="9" rows="21" wrap="off"></textarea>
+          <p><input id="button" onClick="DrawChart()" type="button" value="Draw!">
+        </td>
+        <td><div id="chart"></div></td>
+      </tr>
+    </table>
+
+  </body>
+</html>
